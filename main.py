@@ -29,9 +29,10 @@ def main():
                 if not ok :
                     print( "Invalid operation" )
         else:
-            move = ai.run(quoridor)
+            move = ai.bestmove(game)
             print(move)
-            quoridor.do(move)
+            game.operate(move)
+        turn = not turn
 
     game.display()
 

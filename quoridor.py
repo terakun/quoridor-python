@@ -7,7 +7,7 @@ DY = [0,1,0,-1]
 DX = [1,0,-1,0]
 
 WHITE_GOAL_Y = H - 1 
-BLACK_GOAL_Y = H - 1 
+BLACK_GOAL_Y = 0 
 
 def in_wallarea(y,x):
     return (0 <= y < H-1) and (0 <= x < W-1)
@@ -48,10 +48,12 @@ class Board:
         return (self.get(y+self.walldy[0][movedir],x+self.walldx[0][movedir]) != self.walldir[movedir]) \
                 and (self.get(y+self.walldy[1][movedir],x+self.walldx[1][movedir]) != self.walldir[movedir])
 
-    def reachable(self,pos,gy):
-        print(pos)
+    def reachable(self,wall_pos,walldir,pos,gy):
+        self.set(wall_pos[0],wall_pos[1],walldir)
         visited = [[False for i in range(W)] for j in range(H)]
-        return self.dfs(pos[0],pos[1],gy,visited)
+        is_reachable = self.dfs(pos[0],pos[1],gy,visited)
+        self.set(wall_pos[0],wall_pos[1],WallDir.N)
+        return is_reachable
 
     def next_wallmoves( self , y , x ):
         wallmoves = []
@@ -61,13 +63,10 @@ class Board:
         return wallmoves
 
     def dfs(self,y,x,gy,visited):
-        print(y,x)
         if y == gy:
             return True
     
         visited[y][x] = True
-        for row in visited:
-            print(row)
 
         for (ny,nx) in self.next_wallmoves( y , x ):
             if not visited[ny][nx]:
@@ -94,16 +93,21 @@ class Quoridor:
             Color.N
 
     def settable( self, y , x , d ):
+        if self.board.get(y,x) != WallDir.N :
+            return False
+
         if ( self.is_white_turn and self.white_wall_num == 0 ) or ( not self.is_white_turn and self.black_wall_num == 0 ) : 
             return False
-        if not self.board.reachable( self.white_pos , WHITE_GOAL_Y ) or not self.board.reachable( self.black_pos , BLACK_GOAL_Y ):
+
+        if not self.board.reachable( (y,x) , d , self.white_pos , WHITE_GOAL_Y ) or not self.board.reachable( (y,x) , d , self.black_pos , BLACK_GOAL_Y ):
             print(" not reachable ")
             return False
 
         if d == WallDir.H :
-            return self.board.get(y,x-1) != WallDir.H and self.board.get(y,x) == WallDir.N and self.board.get(y,x+1) != WallDir.H
+            return self.board.get(y,x-1) != WallDir.H and self.board.get(y,x+1) != WallDir.H
         else:
-            return self.board.get(y-1,x) != WallDir.V and self.board.get(y,x) == WallDir.N and self.board.get(y+1,x) != WallDir.V
+            return self.board.get(y-1,x) != WallDir.V and self.board.get(y+1,x) != WallDir.V
+
 
     def movable( self , y , x , player_pos , enemy_pos ):
         if (y,x) in self.next_moves(player_pos,enemy_pos) :
@@ -112,19 +116,19 @@ class Quoridor:
             return False
 
     # 壁，移動両方の可能な手を返す
-    def next_operations( self ):
+    def valid_operations( self ):
         operations = []
         if self.is_white_turn :
-            operations.extend( self.board.next_moves( self.white_pos , self.black_pos ) )
+            operations.extend( self.next_moves( self.white_pos , self.black_pos ) )
         else:
-            operations.extend( self.board.next_moves( self.black_pos , self.white_pos ) )
+            operations.extend( self.next_moves( self.black_pos , self.white_pos ) )
 
         for wy in range(H-1):
             for wx in range(W-1):
-                if settable( wy , wx , WallDir.H ) :
-                    operations.apend( ( wy , wx , WallDir.H ) )
-                if settable( wy , wx , WallDir.V ) :
-                    operations.apend( ( wy , wx , WallDir.V ) )
+                if self.settable( wy , wx , WallDir.H ) :
+                    operations.append( ( wy , wx , WallDir.H ) )
+                if self.settable( wy , wx , WallDir.V ) :
+                    operations.append( ( wy , wx , WallDir.V ) )
 
         return operations
 
@@ -134,11 +138,11 @@ class Quoridor:
         y = player_pos[0]
         x = player_pos[1]
         for d in range(4):
-            if not self.board.check_wallmovable(y,x,d):
-                continue
-
             ny = y + DY[d]
             nx = x + DX[d]
+            if not self.board.check_wallmovable(y,x,d) or ny < 0 or H <= ny or nx < 0 or W <= nx:
+                continue
+
             # 移動先に敵がいたら
             if ny == enemy_pos[0] and nx == enemy_pos[1] :
                     # 飛び越えられたら
